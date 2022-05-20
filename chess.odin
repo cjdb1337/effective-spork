@@ -1,5 +1,13 @@
 package chess
 
+@require foreign import {
+    "system:OpenGL.framework",
+    "system:GLUT.framework",
+    "system:Cocoa.framework",
+    "system:IOKit.framework",
+    "system:CoreVideo.framework"
+}
+
 import "core:fmt"
 import str "core:strings"
 import "vendor:raylib"
@@ -21,6 +29,8 @@ Piece :: struct {
     type : PieceType,
     piecesDefeatedCount : int,
     colour : raylib.Color,
+    isSelected : bool,
+    isDefeated : bool,
 }
 
 new_piece :: proc(xPosition:int = 0, yPosition:int = 0, type:PieceType = .PAWN, piecesDefeatedCount:int = 0, colour:raylib.Color = raylib.WHITE) -> ^Piece {
@@ -190,23 +200,39 @@ has_clicked_board :: proc() -> bool {
     return CheckCollisionPointRec(GetMousePosition(), Rectangle{cast(f32)GetScreenHeight()/6, cast(f32)GetScreenHeight()/6, cast(f32)GetScreenHeight()*2/3, cast(f32)GetScreenHeight()*2/3})
 }
 
-get_piece_left_clicked :: proc(pieces:[16]^Piece) -> (^Piece, bool) {
+get_piece_left_clicked :: proc(whites:[16]^Piece, blacks:[16]^Piece) -> (^Piece, bool) {
     using raylib
 
     if has_clicked_board() {
         mousePos : Vector2 = GetMousePosition()
-        mousePos.x = (mousePos.x - f32(GetScreenHeight()/6) / 800)
-        mousePos.y = (mousePos.y - f32(GetScreenHeight()/6) / 800)
+        mousePos.x = (mousePos.x - f32((GetScreenHeight() / 6))) / 8.33
+        mousePos.y = (mousePos.y - f32((GetScreenHeight() / 6))) / 8.33 
 
-        x : = int(m.floor(mousePos.x))
-        y : = int(m.floor(mousePos.y))
+        x : = int(m.floor(mousePos.x) / 10)
+        y : = int(m.floor(mousePos.y) / 10)
 
-        fmt.println(x)
-        fmt.println(y)
-
-        if piece, succeeded := get_piece_at_coordinate(pieces, x, y); succeeded do return piece, succeeded
+        if piece, succeeded : = get_piece_at_coordinate(whites, x, y); succeeded do return piece, succeeded
+        else if piece, succeeded : = get_piece_at_coordinate(blacks, x, y); succeeded do return piece, succeeded
     }
     return nil, false
+}
+
+draw_possible_moves :: proc(piece:^Piece) {
+    using raylib
+    
+    switch piece.type {
+        case .PAWN: fmt.println("this is a prawn")
+
+        case .ROOK:
+
+        case .KNIGHT:
+
+        case .BISHOP:
+
+        case .KING:
+
+        case .QUEEN:
+    }
 }
 
 main :: proc() {
@@ -219,13 +245,14 @@ main :: proc() {
     originalScreenHOver6 : = GetScreenHeight()/6
 
     fags : ConfigFlags = {.WINDOW_RESIZABLE}
-    SetWindowState(fags)
+    //SetWindowState(fags)
     SetTargetFPS(60)
 
     whitePieces, blackPieces : = init_pieces()
 
     board : = init_chess_board(originalScreenHOver12, Vector2{cast(f32)originalScreenHOver6, cast(f32)originalScreenHOver6})
 
+    selectedPiece : ^Piece = nil
 
 
     for ! WindowShouldClose() {
@@ -241,15 +268,18 @@ main :: proc() {
         draw_pieces(board, whitePieces)
         draw_pieces(board, blackPieces)
 
-        if IsMouseButtonPressed(MouseButton.LEFT) {
-            if has_clicked_board() {
-                if piece, succeeded : = get_piece_left_clicked(whitePieces); succeeded {
-                    fmt.println(piece.type)
-                }
-                else if piece, succeeded : = get_piece_left_clicked(blackPieces); succeeded {
-                    fmt.println(piece.type)
-                }
+        if IsMouseButtonPressed(MouseButton.LEFT) && has_clicked_board() {
+            if sp, succeeded : = get_piece_left_clicked(whitePieces, blackPieces); succeeded {
+                selectedPiece = sp
+                selectedPiece.isSelected = true
+            } else {
+                selectedPiece = nil
+                fmt.println("no longer selected :(")
             }
+        }
+
+        if selectedPiece != nil && selectedPiece.isSelected {
+            draw_possible_moves(selectedPiece)
         }
 
         EndDrawing()

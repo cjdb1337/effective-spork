@@ -217,11 +217,11 @@ get_piece_left_clicked :: proc(whites:[16]^Piece, blacks:[16]^Piece) -> (^Piece,
     return nil, false
 }
 
-draw_possible_moves :: proc(piece:^Piece) {
+draw_possible_moves :: proc(piece:^Piece, board:[64]^Tile) {
     using raylib
     
     switch piece.type {
-        case .PAWN: fmt.println("this is a prawn")
+        case .PAWN: get_tile_at_coordinate(board, piece.x, piece.y)
 
         case .ROOK:
 
@@ -274,13 +274,14 @@ main :: proc() {
                 selectedPiece.isSelected = true
             } else {
                 selectedPiece = nil
-                fmt.println("no longer selected :(")
             }
         }
 
         if selectedPiece != nil && selectedPiece.isSelected {
             draw_possible_moves(selectedPiece)
         }
+
+        if selectedPiece != nil && IsMouseButtonPressed(MouseButton.RIGHT) do selectedPiece.isSelected = false
 
         EndDrawing()
         free_all(context.temp_allocator)

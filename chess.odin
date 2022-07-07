@@ -18,9 +18,11 @@ WINDOW_H :: 1000
 WINDOW_W :: 1000
 WINDOW_TITLE :: "MOST AMAzinGINEST CHESS 🗿"
 source : = "ABCDEFGH"
+source2 : = "12345678"
 
 
 PieceType :: enum{PAWN, ROOK, BISHOP, KNIGHT, KING, QUEEN}
+Cardinality :: enum{H, W}
 
 
 Piece :: struct {
@@ -99,6 +101,10 @@ get_letter_coordinate :: proc(index:int) -> string {
     return source[index:index+1]
 }
 
+get_number_coordinate :: proc(index:int) -> string {
+    return source2[index:index+1]
+}
+
 
 init_pieces :: proc() -> ([16]^Piece, [16]^Piece) {
     using raylib
@@ -141,32 +147,12 @@ init_pieces :: proc() -> ([16]^Piece, [16]^Piece) {
     return whitePieces, blackPieces
 }
 
-draw_tiles :: proc(tiles: [64]^Tile) {
-    using raylib
 
-    for x in tiles {
-        DrawRectangle(x.xStartCoord, x.yStartCoord, x.sideLength, x.sideLength, x.colour)
+update_tile_and_piece_window_coordinates :: proc(board:[64]^Tile, whites:[16]^Piece, blacks:[16]^Piece) {
+    for tile in board {
     }
 }
 
-draw_coordinates :: proc(tiles: [64]^Tile) {
-    using raylib
-
-    for x in tiles {
-        this : cstring
-        if x.xPos == "A" {
-            this = str.clone_to_cstring(x.yPos)
-            DrawText(this, x.xStartCoord - x.sideLength/2, x.yStartCoord + x.sideLength/2, 20, BLACK)
-            delete(this)
-        }
-        if x.yPos == "1" {
-            this = str.clone_to_cstring(x.xPos)
-            DrawText(this, x.xStartCoord + x.sideLength/2, x.yStartCoord - x.sideLength/2, 20, BLACK)
-            delete(this)
-        }
-    }
-    
-}
 
 get_tile_at_coordinate :: proc(board:[64]^Tile, x:int, y:int) -> (^Tile, bool) {
     if x * 8 + y < len(board) do return board[(x*8) + y], true
@@ -194,10 +180,18 @@ draw_pieces :: proc(board:[64]^Tile, pieces:[16]^Piece) {
     }
 }
 
+get_window_fraction_f32 :: #force_inline proc(cardinality:Cardinality, operand:int, denominator:int=1) -> f32 {
+    return cardinality == .H ? f32(operand * int(raylib.GetScreenHeight()) / denominator) : f32(operand * int(raylib.GetScreenWidth()) / denominator)
+}
+
+get_window_fraction_i32 :: proc(cardinality:Cardinality, operand:int, denominator:int=1) -> i32 {
+    return i32(get_window_fraction_f32(cardinality, operand, denominator))
+}
+
 has_clicked_board :: proc() -> bool {
     using raylib
 
-    return CheckCollisionPointRec(GetMousePosition(), Rectangle{cast(f32)GetScreenHeight()/6, cast(f32)GetScreenHeight()/6, cast(f32)GetScreenHeight()*2/3, cast(f32)GetScreenHeight()*2/3})
+    return CheckCollisionPointRec(GetMousePosition(), Rectangle{get_window_fraction_f32(.H, 1, 6), get_window_fraction_f32(.W, 1, 6), get_window_fraction_f32(.H, 2, 3), cast(f32)GetScreenHeight()*2/3})
 }
 
 get_piece_left_clicked :: proc(whites:[16]^Piece, blacks:[16]^Piece) -> (^Piece, bool) {
@@ -205,8 +199,8 @@ get_piece_left_clicked :: proc(whites:[16]^Piece, blacks:[16]^Piece) -> (^Piece,
 
     if has_clicked_board() {
         mousePos : Vector2 = GetMousePosition()
-        mousePos.x = (mousePos.x - f32((GetScreenHeight() / 6))) / 8.33
-        mousePos.y = (mousePos.y - f32((GetScreenHeight() / 6))) / 8.33 
+        mousePos.x = (mousePos.x - get_window_fraction_f32(.H, 1, 6)) / 8.33
+        mousePos.y = (mousePos.y - get_window_fraction_f32(.W, 1, 6)) / 8.33 
 
         x : = int(m.floor(mousePos.x) / 10)
         y : = int(m.floor(mousePos.y) / 10)
@@ -221,7 +215,7 @@ draw_possible_moves :: proc(piece:^Piece, board:[64]^Tile) {
     using raylib
     
     switch piece.type {
-        case .PAWN: get_tile_at_coordinate(board, piece.x, piece.y)
+        case .PAWN: get_tile_at_coordinate(board, piece.xPosition, piece.yPosition)
 
         case .ROOK:
 
@@ -235,22 +229,65 @@ draw_possible_moves :: proc(piece:^Piece, board:[64]^Tile) {
     }
 }
 
+get_square :: proc() -> raylib.Rectangle {
+    using raylib
+
+
+    return {0, 0, 0, 0}
+}
+
+draw_prawn_moves :: proc(x:int, y:int, tile:^Tile, isFirstMove:bool=false) {
+    using raylib
+
+
+}
+
+draw_board :: proc() {
+    using raylib
+
+    cardinality : = get_smallest_dimension()
+    tileWidth : = get_window_fraction_i32(cardinality, 1, 12)
+
+    startCoordinateX : = get_window_fraction_i32(.W, 1, 2) - (tileWidth * 4)
+    startCoordinateY : = get_window_fraction_i32(.H, 1, 2) - (tileWidth * 4)
+
+    for x in 0..7 {
+        for y in 0..7 {
+            DrawRectangle(startCoordinateX + (i32(y) * tileWidth), startCoordinateY + (i32(x) * tileWidth), tileWidth, tileWidth, x%2 == y%2 ? WHITE : BLACK)
+            DrawRectangleLinesEx({f32(startCoordinateX), f32(startCoordinateY), f32(tileWidth*8), f32(tileWidth*8)}, 5, BLACK)
+
+            this : cstring
+            if y == 0 {
+                this = str.clone_to_cstring(get_letter_coordinate(x))
+                DrawText(this, startCoordinateX + (tileWidth/2) + (i32(x)*tileWidth), startCoordinateY - (tileWidth/2), 20, BLACK)
+                delete(this)
+            }
+            if x == 0 {
+                this = str.clone_to_cstring(get_number_coordinate(y))
+                DrawText(this, startCoordinateX - (tileWidth/2), startCoordinateY + (tileWidth/2) + (i32(y)*tileWidth), 20, BLACK)
+                delete(this)
+            }
+        }
+    }
+}
+
+get_smallest_dimension :: proc() -> Cardinality {
+    return raylib.GetScreenWidth() > raylib.GetScreenHeight() ? .H : .W
+}
+
 main :: proc() {
     using raylib
 
     InitWindow(WINDOW_W, WINDOW_H, WINDOW_TITLE)
     defer CloseWindow()
 
-    originalScreenHOver12 : = GetScreenHeight()/12
-    originalScreenHOver6 : = GetScreenHeight()/6
-
     fags : ConfigFlags = {.WINDOW_RESIZABLE}
-    //SetWindowState(fags)
+    SetWindowState(fags)
     SetTargetFPS(60)
 
     whitePieces, blackPieces : = init_pieces()
 
-    board : = init_chess_board(originalScreenHOver12, Vector2{cast(f32)originalScreenHOver6, cast(f32)originalScreenHOver6})
+    board : = init_chess_board(get_window_fraction_i32(.H, 1, 12), Vector2{get_window_fraction_f32(.H, 1, 6), get_window_fraction_f32(.H, 1, 6)})
 
     selectedPiece : ^Piece = nil
 
@@ -260,10 +297,9 @@ main :: proc() {
         ClearBackground(WHITE)
         DrawFPS(5, 5)
 
-        draw_tiles(board)
-        DrawRectangleLinesEx({cast(f32)originalScreenHOver6, cast(f32)originalScreenHOver6, cast(f32)originalScreenHOver12*8, cast(f32)originalScreenHOver12*8}, 5, BLACK)
+        if IsWindowResized() do update_tile_and_piece_window_coordinates(board, whitePieces, blackPieces)
 
-        draw_coordinates(board)
+        draw_board()
 
         draw_pieces(board, whitePieces)
         draw_pieces(board, blackPieces)
@@ -278,7 +314,7 @@ main :: proc() {
         }
 
         if selectedPiece != nil && selectedPiece.isSelected {
-            draw_possible_moves(selectedPiece)
+            draw_possible_moves(selectedPiece, board)
         }
 
         if selectedPiece != nil && IsMouseButtonPressed(MouseButton.RIGHT) do selectedPiece.isSelected = false

@@ -166,18 +166,26 @@ get_piece_at_coordinate :: proc(pieces:[16]^Piece, x:int, y:int) -> (^Piece, boo
     return nil, false
 }
 
-draw_pieces :: proc(board:[64]^Tile, pieces:[16]^Piece) {
+draw_pieces :: proc(pieces:[16]^Piece) {
     using raylib
+
+    tileWidth, startCoordinateX, startCoordinateY : = get_board_i32()
+
     for piece in pieces {
+        
         this_too : = fmt.tprint(piece.type)
         this : cstring = str.clone_to_cstring(this_too)
-        that : ^Tile
-        if tile, succeeded := get_tile_at_coordinate(board, piece.xPosition, piece.yPosition); succeeded {
-            that = tile
-            DrawText(this, that.xStartCoord, that.yStartCoord + that.sideLength/2, 20, that.colour == WHITE ? BLACK : WHITE)
-        }
+        DrawText(this, startCoordinateX + 6 + (i32(piece.xPosition) * tileWidth), startCoordinateY + (tileWidth/2) + (i32(piece.yPosition) * tileWidth), 20, GRAY)
         delete(this)
     }
+}
+
+draw_bw_text :: proc(text:cstring, posX:i32, posY:i32, fontSize:i32) {
+    using raylib
+
+    DrawText(text, posX-1, posY-1, fontSize+4, GRAY)
+//    DrawText(text, posX, posY, fontSize, WHITE)
+
 }
 
 get_window_fraction_f32 :: #force_inline proc(cardinality:Cardinality, operand:int, denominator:int=1) -> f32 {
@@ -197,13 +205,15 @@ has_clicked_board :: proc() -> bool {
 get_piece_left_clicked :: proc(whites:[16]^Piece, blacks:[16]^Piece) -> (^Piece, bool) {
     using raylib
 
-    if has_clicked_board() {
-        mousePos : Vector2 = GetMousePosition()
-        mousePos.x = (mousePos.x - get_window_fraction_f32(.H, 1, 6)) / 8.33
-        mousePos.y = (mousePos.y - get_window_fraction_f32(.W, 1, 6)) / 8.33 
+    tileWidth, boardX, boardY : = get_board_i32()
 
-        x : = int(m.floor(mousePos.x) / 10)
-        y : = int(m.floor(mousePos.y) / 10)
+    mousePos : Vector2 = GetMousePosition()
+    boardXClicked : = i32(mousePos.x) - boardX
+    boardYClicked : = i32(mousePos.y) - boardY
+
+    if boardXClicked > 0 && boardYClicked > 0 {
+        x : = int((boardXClicked / tileWidth))
+        y : = int((boardYClicked / tileWidth))
 
         if piece, succeeded : = get_piece_at_coordinate(whites, x, y); succeeded do return piece, succeeded
         else if piece, succeeded : = get_piece_at_coordinate(blacks, x, y); succeeded do return piece, succeeded
@@ -215,7 +225,7 @@ draw_possible_moves :: proc(piece:^Piece, board:[64]^Tile) {
     using raylib
     
     switch piece.type {
-        case .PAWN: get_tile_at_coordinate(board, piece.xPosition, piece.yPosition)
+        case .PAWN: draw_prawn_moves(piece.xPosition, piece.yPosition, piece.colour == WHITE, true)
 
         case .ROOK:
 
@@ -236,25 +246,29 @@ get_square :: proc() -> raylib.Rectangle {
     return {0, 0, 0, 0}
 }
 
-draw_prawn_moves :: proc(x:int, y:int, tile:^Tile, isFirstMove:bool=false) {
+draw_prawn_moves :: proc(x:int, y:int, isWhite:bool, isFirstMove:bool=false) {
     using raylib
 
+    tileWidth, xStart, yStart : = get_board_i32()
+    upOrDown : = isWhite ? -1 : 1
+    DrawRectangle(xStart + (tileWidth*i32(x)), yStart + (tileWidth*i32(y+upOrDown)), tileWidth, tileWidth, ORANGE)
+    if isFirstMove do DrawRectangle(xStart + (tileWidth*i32(x)), yStart + (tileWidth*i32(y+(upOrDown*2))), tileWidth, tileWidth, ORANGE)
+}
 
+get_board_i32 :: proc() -> (i32, i32, i32) {
+    tileWidth : = get_window_fraction_i32(get_smallest_dimension(), 1, 12)
+    return tileWidth, (get_window_fraction_i32(.W, 1, 2) - (tileWidth * 4)), (get_window_fraction_i32(.H, 1, 2) - (tileWidth * 4))
 }
 
 draw_board :: proc() {
     using raylib
 
-    cardinality : = get_smallest_dimension()
-    tileWidth : = get_window_fraction_i32(cardinality, 1, 12)
-
-    startCoordinateX : = get_window_fraction_i32(.W, 1, 2) - (tileWidth * 4)
-    startCoordinateY : = get_window_fraction_i32(.H, 1, 2) - (tileWidth * 4)
+    tileWidth, startCoordinateX, startCoordinateY : = get_board_i32()
 
     for x in 0..7 {
         for y in 0..7 {
             DrawRectangle(startCoordinateX + (i32(y) * tileWidth), startCoordinateY + (i32(x) * tileWidth), tileWidth, tileWidth, x%2 == y%2 ? WHITE : BLACK)
-            DrawRectangleLinesEx({f32(startCoordinateX), f32(startCoordinateY), f32(tileWidth*8), f32(tileWidth*8)}, 5, BLACK)
+            DrawRectangleLinesEx({f32(startCoordinateX-5), f32(startCoordinateY-5), f32(tileWidth*8+10), f32(tileWidth*8+10)}, 5, BLACK)
 
             this : cstring
             if y == 0 {
@@ -297,17 +311,16 @@ main :: proc() {
         ClearBackground(WHITE)
         DrawFPS(5, 5)
 
-        if IsWindowResized() do update_tile_and_piece_window_coordinates(board, whitePieces, blackPieces)
-
         draw_board()
 
-        draw_pieces(board, whitePieces)
-        draw_pieces(board, blackPieces)
+        draw_pieces(whitePieces)
+        draw_pieces(blackPieces)
 
-        if IsMouseButtonPressed(MouseButton.LEFT) && has_clicked_board() {
+        if IsMouseButtonPressed(MouseButton.LEFT) {
             if sp, succeeded : = get_piece_left_clicked(whitePieces, blackPieces); succeeded {
                 selectedPiece = sp
                 selectedPiece.isSelected = true
+                fmt.print(selectedPiece.type)
             } else {
                 selectedPiece = nil
             }
